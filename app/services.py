@@ -8,9 +8,9 @@ executor = ThreadPoolExecutor(max_workers=1)
 load_dotenv()
 
 # Chargement des variables d'environement
-
 HF_TOKEN = os.getenv("HF_TOKEN")
 MODEL_NAME = os.getenv("MODEL_NAME", "cmarkea/distilcamembert-base-sentiment")
+MODEL_NAME_URGENCE = os.getenv("MODEL_NAME_URGENCE")
 MAX_TEXT_LENGTH = int(os.getenv("MAX_TEXT_LENGTH", 1000))
 
 if not MODEL_NAME:
@@ -24,22 +24,13 @@ classifier = pipeline(
     token=HF_TOKEN
 )
 
-print("Modèle chargé avec succès !")
+urgency_classifier = pipeline(
+    "zero-shot-classification",
+    model=MODEL_NAME_URGENCE,
+    token=HF_TOKEN
+)
 
-# Mot cles d'urgence
-URGENT_KEYWORDS = [
-    "arnaque",
-    "escroquerie",
-    "vol",
-    "plainte",
-    "justice",
-    "urgent",
-    "remboursement",
-    "cassé",
-    "défectueux",
-    "litige",
-    "danger",
-]
+print("Modèle chargé avec succès !")
 
 def convert_label(label: str) -> str:
     """
@@ -58,17 +49,19 @@ def convert_label(label: str) -> str:
     return mapping.get(label.lower(), "inconnue")
 
 
-def detect_urgency(text: str) -> bool:
+def detect_urgency(text: str):
     """
     Retourne True si le texte contient
     un mot-clé considéré comme urgent.
     """
 
-    text = text.lower()
+    result = urgency_classifier(
+        text,
+        candidate_labels=["urgent","non urgent"]
+    )
 
-    return any(
-        keyword in text
-        for keyword in URGENT_KEYWORDS
+    return (
+        result["labels"][0] == "urgent" and result["scores"][0] > 0.80
     )
 
 # Fonction principale
